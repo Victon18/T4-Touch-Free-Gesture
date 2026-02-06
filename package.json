@@ -1,0 +1,25 @@
+{
+  "name": "gesture",
+  "private": true,
+  "scripts": {
+    "ai-dev": "FLASK_DEBUG=1 pip3 install -r requirements.txt && python3 -m flask --app apps/web/ai/index run -p 5328",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4",
+    "turbo": "^2.8.3",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "npm@11.7.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
