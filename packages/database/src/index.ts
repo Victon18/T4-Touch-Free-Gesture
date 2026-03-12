@@ -1,2 +1,3 @@
-export { prisma } from './assign'
-export default prisma
+import { prisma } from './assign';
+export { prisma };
+export default prisma;

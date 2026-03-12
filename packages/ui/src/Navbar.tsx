@@ -39,14 +39,14 @@ export default function Navbar({
     <nav
       className={
         `w-full bg-gradient-to-r from-[#fbe5f8] to-[#f6d4fa] shadow-md backdrop-blur-sm sticky top-0 z-50 transition-opacity duration-700 z-50
-        ${isVisible ? "tarnslate y-0" : "-translate-y-full"}`}>
+        ${isVisible ? "translate-y-0" : "-translate-y-full"}`}>
 
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
         {/* Logo Section */}
         <div className="flex items-center space-x-2">
           <MagicWandIcon className="w-6 h-6 text-pink-600" />
           <Link href="/" className="text-xl font-bold text-gray-900">
-            STYLE<span className="text-pink-600">SYNTH</span>
+            GESTURE<span className="text-pink-600">LOVE</span>
           </Link>
         </div>
 

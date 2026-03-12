@@ -13,5 +13,8 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0"
   }
 }

@@ -1,7 +1,7 @@
 "use client"
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Navbar from '@repo/ui/Navbar'
+import Navbar from './Navbar';
 
 const AppbarClient = () => {
   const session = useSession();
