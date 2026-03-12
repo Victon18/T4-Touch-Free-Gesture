@@ -7,10 +7,10 @@
     "db:deploy": "prisma migrate deploy"
   },
   "dependencies": {
-    "@prisma/client": "^6.17.1",
+    "@prisma/client": "^7.4.2",
     "@prisma/extension-accelerate": "^2.0.2"
   },
   "exports": {
-     "./client": "./src/index.ts"
+    "./client": "./src/index.ts"
   }
 }
