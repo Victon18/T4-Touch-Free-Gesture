@@ -1,54 +1,77 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@repo/ui/button";
+import { Input } from "@repo/ui/input";
+import { Label } from "@repo/ui/label";
+import Link from "next/link";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+function SigninForm() {
   const router = useRouter();
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
+  const searchParams = useSearchParams();
+  const isRegistered = searchParams.get("registered");
+  const callbackUrl = searchParams.get("callbackUrl") || "/home";
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleCredentialsLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    const formData = new FormData(e.currentTarget);
+    const phone = formData.get("phone") as string;
+    const password = formData.get("password") as string;
+
     try {
-      const result = await signIn("credentials", {
+      const res = await signIn("credentials", {
+        redirect: false,
         phone,
         password,
-        redirect: false,
       });
 
-      if (result?.error) {
+      if (res?.error) {
         setError("Invalid phone number or password");
-      } else if (result?.ok) {
-        router.push("/home");
+      } else {
+        router.push(callbackUrl);
       }
-    } catch (err) {
-      setError("An error occurred. Please try again.");
+    } catch (err: any) {
+      setError("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGoogleLogin = async () => {
+};
+const handleGoogleLogin = async () => {
     setLoading(true);
     await signIn("google", { callbackUrl: "/home" });
-  };
-
+};
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1a1f2e] px-4">
-      <div className="max-w-md w-full bg-[#252b3b] rounded-3xl shadow-2xl p-10">
-        {error && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-800 rounded-lg">
-            <p className="text-red-400 text-sm">{error}</p>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border border-border bg-card p-8 shadow-fashion-shadow">
+        <div className="space-y-2 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            Welcome Back
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Enter your credentials to access your account
+          </p>
+        </div>
+
+        {isRegistered && (
+          <div className="rounded-md bg-green-500/15 p-3 text-sm text-green-600 font-medium text-center">
+            Registration successful! Please sign in.
           </div>
         )}
 
+        {error && (
+          <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive text-center">
+            {error}
+          </div>
+        )}
         <button
           onClick={handleGoogleLogin}
           disabled={loading}
@@ -75,55 +98,49 @@ export default function LoginPage() {
           Sign in with Google
         </button>
 
-        <div className="relative mb-8">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-600"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-3 bg-[#252b3b] text-gray-400">or</span>
-          </div>
-        </div>
 
-        <form onSubmit={handleCredentialsLogin} className="space-y-6">
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
-              Phone number
-            </label>
-            <input
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
               id="phone"
-              type="text"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="1231231231"
+              name="phone"
+              type="tel"
+              placeholder="1234567890"
               required
-              className="w-full px-4 py-3.5 bg-[#1a1f2e] border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
             />
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-              Password
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
               id="password"
+              name="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
               required
-              className="w-full px-4 py-3.5 bg-[#1a1f2e] border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#1a1f2e] border border-gray-700 text-white py-3.5 rounded-xl font-medium hover:bg-[#151924] focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Signing in..." : "Sign in with Credentials"}
-          </button>
+          <Button type="submit" className="w-full bg-pink-600 hover:bg-pink-700 text-white" disabled={loading}>
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
         </form>
+
+        <div className="text-center text-sm">
+          Don't have an account?{" "}
+          <Link href="/signup" className="font-semibold text-pink-600 hover:text-pink-500 transition-colors">
+            Sign up
+          </Link>
+        </div>
       </div>
     </div>
   );
+}
+
+export default function SigninPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <SigninForm />
+    </Suspense>
+  )
 }

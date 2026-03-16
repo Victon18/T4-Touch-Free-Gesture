@@ -4,6 +4,8 @@
   "private": true,
   "exports": {
     "./button": "./src/ui/button.tsx",
+    "./input": "./src/ui/input.tsx",
+    "./label": "./src/ui/label.tsx",
     "./*": "./src/*.tsx"
   },
   "scripts": {
@@ -21,6 +23,7 @@
     "typescript": "5.9.2"
   },
   "dependencies": {
+    "@radix-ui/react-label": "^2.1.8",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   }

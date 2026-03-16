@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['@repo/db'],
   serverExternalPackages: ['@prisma/client'],
-  outputFileTracingIncludes: {
-    '/*': ['../../packages/database/generated/prisma/**/*'],
-  },
 };
 
 export default nextConfig;

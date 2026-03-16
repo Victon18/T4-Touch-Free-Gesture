@@ -31,27 +31,10 @@ export const authOptions = {
                         email: existingUser.number
                     }
                 }
-                return null;
+                return null; // Invalid password
             }
-
-            try {
-                const user = await db.user.create({
-                    data: {
-                        number: credentials.phone,
-                        password: hashedPassword
-                    }
-                });
-
-                return {
-                    id: user.id.toString(),
-                    name: user.name,
-                    email: user.number
-                }
-            } catch(e) {
-                console.error(e);
-            }
-
-            return null
+            // User does not exist, reject login
+            return null;
           },
         })
     ],

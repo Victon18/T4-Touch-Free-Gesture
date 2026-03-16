@@ -11,6 +11,8 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@prisma/client": "^7.5.0",
+    "@repo/db": "*",
     "@repo/ui": "*",
     "next": "16.1.5",
     "react": "^19.2.0",
