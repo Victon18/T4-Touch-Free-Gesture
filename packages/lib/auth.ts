@@ -16,7 +16,7 @@ export const authOptions = {
             password: { label: "Password", type: "password" }
           },
           async authorize(credentials: any) {
-            const hashedPassword = await bcrypt.hash(credentials.password, 10);
+            if (!credentials?.phone || !credentials?.password) return null;
             const existingUser = await db.user.findFirst({
                 where: {
                     number: credentials.phone
@@ -38,7 +38,11 @@ export const authOptions = {
           },
         })
     ],
-    secret: process.env.JWT_SECRET || "secret",
+    secret: (() => {
+        const s = process.env.JWT_SECRET;
+        if (!s) console.warn("[AUTH] WARNING: JWT_SECRET is not set. Using insecure default.");
+        return s || "secret";
+    })(),
     pages: {
         signIn: '/signin',
     },
