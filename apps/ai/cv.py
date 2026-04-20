@@ -4,6 +4,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import math
 from collections import deque
+import threading
 
 # ── Shared state ────────────────────────────────────────────────────────────
 latest_gesture    = "None"
@@ -231,41 +232,89 @@ def _draw_landmarks(frame, hand_landmarks_list, gesture_label: str, confidence: 
 
     return frame
 
-# ── Main CV loop ─────────────────────────────────────────────────────────────
+# ── Camera control / main CV loop ───────────────────────────────────────────
+# Runtime-managed state so the capture can be started/stopped from the API.
+_running = False
+_thread: threading.Thread | None = None
+_cap = None
+
+
+def start_capture() -> bool:
+    """Start the CV loop in a background thread. Returns True if started, False if already running."""
+    global _running, _thread
+    if _running:
+        return False
+    _running = True
+    _thread = threading.Thread(target=run_cv, daemon=True)
+    _thread.start()
+    return True
+
+
+def stop_capture() -> bool:
+    """Request the CV loop to stop and release the camera. Returns True if it was running."""
+    global _running, _cap, latest_frame
+    if not _running:
+        return False
+    _running = False
+    # release cap if it's open
+    try:
+        if _cap is not None:
+            _cap.release()
+    except Exception:
+        pass
+    latest_frame = None
+    return True
+
+
+def is_running() -> bool:
+    return bool(_running)
+
+
 def run_cv():
-    global latest_gesture, latest_confidence, latest_frame
+    """Main CV loop. This function returns when _running is set to False."""
+    global latest_gesture, latest_confidence, latest_frame, _cap, _running
 
     base_options = python.BaseOptions(model_asset_path="hand_landmarker.task")
     options      = vision.HandLandmarkerOptions(base_options=base_options, num_hands=2)
     landmarker   = vision.HandLandmarker.create_from_options(options)
 
-    cap = cv2.VideoCapture(0)
+    _cap = cv2.VideoCapture(0)
     # Request higher resolution for better landmark accuracy
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,  720)
+    _cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1280)
+    _cap.set(cv2.CAP_PROP_FRAME_HEIGHT,  720)
 
-    while True:
-        success, frame = cap.read()
-        if not success:
-            continue
+    try:
+        while _running:
+            success, frame = _cap.read()
+            if not success:
+                time.sleep(0.05)
+                continue
 
-        frame = cv2.flip(frame, 1)   # mirror so left↔right feel natural
+            frame = cv2.flip(frame, 1)   # mirror so left↔right feel natural
 
-        rgb      = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        result   = landmarker.detect(mp_image)
+            rgb      = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+            result   = landmarker.detect(mp_image)
 
-        if result.hand_landmarks:
-            gesture, conf = recognize_gesture(result.hand_landmarks[0])
-            latest_gesture    = gesture
-            latest_confidence = conf
-            frame = _draw_landmarks(frame, result.hand_landmarks, gesture, conf)
-        else:
-            _gesture_history.clear()
-            latest_gesture    = "None"
-            latest_confidence = 0.0
-            cv2.putText(frame, "No hand detected", (18, 44),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (80, 80, 80), 2, cv2.LINE_AA)
+            if result.hand_landmarks:
+                gesture, conf = recognize_gesture(result.hand_landmarks[0])
+                latest_gesture    = gesture
+                latest_confidence = conf
+                frame = _draw_landmarks(frame, result.hand_landmarks, gesture, conf)
+            else:
+                _gesture_history.clear()
+                latest_gesture    = "None"
+                latest_confidence = 0.0
+                cv2.putText(frame, "No hand detected", (18, 44),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (80, 80, 80), 2, cv2.LINE_AA)
 
-        _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
-        latest_frame = buf.tobytes()
+            _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+            latest_frame = buf.tobytes()
+    finally:
+        try:
+            if _cap is not None:
+                _cap.release()
+        except Exception:
+            pass
+        _cap = None
+        _running = False

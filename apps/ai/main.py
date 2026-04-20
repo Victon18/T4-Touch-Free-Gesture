@@ -291,5 +291,24 @@ def video_feed(request: Request):
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
 
-# ── Background CV thread ──────────────────────────────────────────────────────
-threading.Thread(target=cv_module.run_cv, daemon=True).start()
+# ── Camera control endpoints (start / stop) ──────────────────────────────────
+@app.post("/camera/start")
+@limiter.limit("10/minute")
+async def camera_start(request: Request):
+    _check_origin(request)
+    started = cv_module.start_capture()
+    return JSONResponse({"ok": True, "started": bool(started)})
+
+
+@app.post("/camera/stop")
+@limiter.limit("10/minute")
+async def camera_stop(request: Request):
+    _check_origin(request)
+    stopped = cv_module.stop_capture()
+    return JSONResponse({"ok": True, "stopped": bool(stopped)})
+
+
+@app.get("/camera/status")
+@limiter.limit("30/minute")
+async def camera_status(request: Request):
+    return {"running": bool(getattr(cv_module, "is_running", lambda: False)())}

@@ -7,7 +7,7 @@ import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import Link from "next/link";
 
-export default function SignupPage() {
+export default function SignupForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

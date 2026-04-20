@@ -207,6 +207,7 @@ export default function ControlPage() {
   const [gesture, setGesture]       = useState<GestureKey>("NONE")
   const [lastAction, setLastAction] = useState("")
   const [actionLog, setActionLog]   = useState<string[]>([])
+  const [camOn, setCamOn]           = useState(false)
 
   const activeDevice = DEVICE_ORDER[activeIdx]
   const lastGstRef   = useRef<GestureKey>("NONE")
@@ -425,6 +426,12 @@ export default function ControlPage() {
     return () => clearInterval(id)
   }, [fetchDevices])
 
+  useEffect(() => {
+    let mounted = true
+    fetch(`${API}/camera/status`).then(r => r.json()).then(j => { if (mounted) setCamOn(!!j.running) }).catch(() => {})
+    return () => { mounted = false }
+  }, [])
+
   if (!devices) return <div style={s.loading}>Connecting to backend…</div>
 
   const gMeta = GESTURE_META[gesture] ?? GESTURE_META["NONE"]
@@ -455,6 +462,17 @@ export default function ControlPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={`${API}/video_feed`} alt="Live camera" style={s.video} />
             <div style={s.videoLabel}>📷 Camera Feed</div>
+            <button onClick={async () => {
+              try {
+                if (camOn) {
+                  await fetch(`${API}/camera/stop`, { method: 'POST' })
+                  setCamOn(false)
+                } else {
+                  await fetch(`${API}/camera/start`, { method: 'POST' })
+                  setCamOn(true)
+                }
+              } catch (e) { /* ignore */ }
+            }} style={{ position: 'absolute', top: 8, right: 8, background: '#111126', color: '#fff', borderRadius: 8, padding: '6px 8px', fontSize: 12, border: '1px solid #2e2e4e', cursor: 'pointer' }}>{camOn ? 'Stop Camera' : 'Start Camera'}</button>
           </div>
 
           {/* Active gesture action hint */}

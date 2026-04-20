@@ -1,3 +1,5 @@
-fastapi==0.115.8
-uvicorn==0.34.0
-slowapi==0.1.9
+fastapi
+uvicorn
+slowapi
+opencv-python
+mediapipe

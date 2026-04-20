@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import Link from "next/link";
-import { Suspense } from "react";
 
-function SigninForm() {
+export default function SigninForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegistered = searchParams.get("registered");
@@ -44,11 +43,13 @@ function SigninForm() {
     } finally {
       setLoading(false);
     }
-};
-const handleGoogleLogin = async () => {
+  };
+
+  const handleGoogleLogin = async () => {
     setLoading(true);
     await signIn("google", { callbackUrl: "/home" });
-};
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-6 rounded-2xl border border-border bg-card p-8 shadow-fashion-shadow">
@@ -135,12 +136,4 @@ const handleGoogleLogin = async () => {
       </div>
     </div>
   );
-}
-
-export default function SigninPage() {
-  return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
-      <SigninForm />
-    </Suspense>
-  )
 }
