@@ -1,4 +1,4 @@
-"use client"
+'use client'
 import { useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import {
@@ -9,7 +9,7 @@ import {
   VscSignIn,
 } from 'react-icons/vsc';
 
-import Dock from './Dock';
+import Dock from './reactbits/Dock';
 
 const Nav = () => {
   const router = useRouter();
@@ -49,16 +49,13 @@ const Nav = () => {
 
 
   return (
-<>
-      <Dock
-        items={items}
-        panelHeight={68}
-        baseItemSize={50}
-        magnification={72}
-      />
-
-</>
-)
+    <Dock
+      items={items}
+      panelHeight={68}
+      baseItemSize={50}
+      magnification={72}
+    />
+  )
 };
 
 export default Nav;

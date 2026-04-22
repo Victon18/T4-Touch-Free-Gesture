@@ -1,18 +1,36 @@
-'use client'
-import { motion } from 'motion/react';
+import { motion, Transition, Easing } from 'motion/react';
 import { useEffect, useRef, useState, useMemo } from 'react';
+import './BlurText.css';
 
-const buildKeyframes = (from, steps) => {
-  const keys = new Set([...Object.keys(from), ...steps.flatMap(s => Object.keys(s))]);
+type BlurTextProps = {
+  text?: string;
+  delay?: number;
+  className?: string;
+  animateBy?: 'words' | 'letters';
+  direction?: 'top' | 'bottom';
+  threshold?: number;
+  rootMargin?: string;
+  animationFrom?: Record<string, string | number>;
+  animationTo?: Array<Record<string, string | number>>;
+  easing?: Easing | Easing[];
+  onAnimationComplete?: () => void;
+  stepDuration?: number;
+};
 
-  const keyframes = {};
+const buildKeyframes = (
+  from: Record<string, string | number>,
+  steps: Array<Record<string, string | number>>
+): Record<string, Array<string | number>> => {
+  const keys = new Set<string>([...Object.keys(from), ...steps.flatMap(s => Object.keys(s))]);
+
+  const keyframes: Record<string, Array<string | number>> = {};
   keys.forEach(k => {
     keyframes[k] = [from[k], ...steps.map(s => s[k])];
   });
   return keyframes;
 };
 
-const BlurText = ({
+const BlurText: React.FC<BlurTextProps> = ({
   text = '',
   delay = 200,
   className = '',
@@ -22,22 +40,19 @@ const BlurText = ({
   rootMargin = '0px',
   animationFrom,
   animationTo,
-  easing = t => t,
+  easing = (t: number) => t,
   onAnimationComplete,
   stepDuration = 0.35
 }) => {
   const elements = animateBy === 'words' ? text.split(' ') : text.split('');
   const [inView, setInView] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     if (!ref.current) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.unobserve(ref.current);
-        }
+        setInView(entry.isIntersecting);
       },
       { threshold, rootMargin }
     );
@@ -70,27 +85,34 @@ const BlurText = ({
   const totalDuration = stepDuration * (stepCount - 1);
   const times = Array.from({ length: stepCount }, (_, i) => (stepCount === 1 ? 0 : i / (stepCount - 1)));
 
+  // Extract color classes from className
+  const colorClass = className.split(' ').find(c => c.startsWith('text-')) || 'text-white';
+
   return (
-    <p ref={ref} className={className} style={{ display: 'flex', flexWrap: 'wrap' }}>
+    <p ref={ref} className={`blur-text flex flex-wrap`}>
       {elements.map((segment, index) => {
         const animateKeyframes = buildKeyframes(fromSnapshot, toSnapshots);
 
-        const spanTransition = {
+        const spanTransition: Transition = {
           duration: totalDuration,
           times,
-          delay: (index * delay) / 1000
+          delay: (index * delay) / 1000,
+          ease: easing
         };
-        spanTransition.ease = easing;
 
         return (
           <motion.span
-            className="inline-block will-change-[transform,filter,opacity]"
             key={index}
             initial={fromSnapshot}
-            style={{ color: "white" }}
             animate={inView ? animateKeyframes : fromSnapshot}
             transition={spanTransition}
             onAnimationComplete={index === elements.length - 1 ? onAnimationComplete : undefined}
+            className={className}
+            style={{
+              display: 'inline-block',
+              willChange: 'transform, filter, opacity',
+              color: 'white'
+            }}
           >
             {segment === ' ' ? '\u00A0' : segment}
             {animateBy === 'words' && index < elements.length - 1 && '\u00A0'}
@@ -102,3 +124,4 @@ const BlurText = ({
 };
 
 export default BlurText;
+

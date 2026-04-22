@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-.big-shoulders {
+big-shoulders {
   font-family: 'Big Shoulders Display', sans-serif;
+}
+html, body {
+  background: black;
 }
