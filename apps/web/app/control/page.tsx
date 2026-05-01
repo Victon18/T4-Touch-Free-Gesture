@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useRef, useState, useCallback } from "react"
+import { initGestureRecognizer, getGestureRecognizer, detectCustomGestures, detectDualHandGestures, detectBothHandsPresent } from "@/lib/gesture"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type DeviceName = "light" | "fan" | "tv" | "ac" | "speaker"
@@ -13,10 +14,15 @@ interface SpeakerDevice  extends BaseDevice { type: "speaker"; volume: number; t
 type Device = LightDevice | FanDevice | TvDevice | AcDevice | SpeakerDevice
 interface DevicesState { light: LightDevice; fan: FanDevice; tv: TvDevice; ac: AcDevice; speaker: SpeakerDevice }
 
-const API            = "http://localhost:8000"
-const COOLDOWN_MS    = 450
-const POLL_GESTURE   = 180
-const POLL_DEVICES   = 1200
+const COOLDOWN_MS    = 600
+
+const INITIAL_DEVICES: DevicesState = {
+  light: { status: "OFF", type: "light", label: "Living Room Light", icon: "💡", brightness: 50 },
+  fan: { status: "OFF", type: "fan", label: "Ceiling Fan", icon: "🌪", speed: 3 },
+  tv: { status: "OFF", type: "tv", label: "Smart TV", icon: "📺", channel: 5, volume: 20 },
+  ac: { status: "OFF", type: "ac", label: "Air Conditioner", icon: "❄️", temperature: 24, mode: "cool" },
+  speaker: { status: "OFF", type: "speaker", label: "Home Pod", icon: "🔊", volume: 40, track: 1 }
+};
 
 // ── Gesture mapping ───────────────────────────────────────────────────────────
 type GestureKey =
@@ -26,36 +32,53 @@ type GestureKey =
 
 function gestureKey(raw: string): GestureKey {
   const s = raw.toLowerCase()
-  if (s.includes("thumbs up"))     return "THUMBS_UP"
-  if (s.includes("thumbs down"))   return "THUMBS_DOWN"
+  if (s.includes("thumbs up") || s.includes("thumb_up")) return "THUMBS_UP"
+  if (s.includes("thumbs down") || s.includes("thumb_down")) return "THUMBS_DOWN"
   if (s.includes("pinch"))         return "PINCH"
-  if (s.includes("open palm"))     return "OPEN_PALM"
-  if (s.includes("peace"))         return "PEACE"
-  if (s.includes("pointing"))      return "POINTING"
-  if (s.includes("rock"))          return "ROCK"
+  if (s.includes("open palm") || s.includes("open_palm")) return "OPEN_PALM"
+  if (s.includes("peace") || s.includes("victory")) return "PEACE"
+  if (s.includes("pointing") || s.includes("pointing_up")) return "POINTING"
+  if (s.includes("rock") || s.includes("iloveyou")) return "ROCK"
   if (s.includes("ok"))            return "OK"
   if (s.includes("three"))         return "THREE"
-  if (s.includes("call me"))       return "CALL_ME"
+  if (s.includes("call me") || s.includes("call_me")) return "CALL_ME"
   if (s.includes("four"))          return "FOUR"
-  if (s.includes("fist"))          return "FIST"
+  if (s.includes("fist") || s.includes("closed_fist")) return "FIST"
   return "NONE"
 }
 
 const DEVICE_ORDER: DeviceName[] = ["light", "fan", "tv", "ac", "speaker"]
 
+// Gesture-to-device toggle mapping (direct control)
+const GESTURE_TO_DEVICE: Record<GestureKey, DeviceName | undefined> = {
+  THREE: "light",     // Three Fingers = Toggle Light
+  FOUR: "fan",        // Four Fingers = Toggle Fan
+  ROCK: "tv",         // Rock = Toggle TV
+  PEACE: "ac",        // Peace = Toggle AC
+  CALL_ME: "speaker", // Call Me = Toggle Speaker
+  THUMBS_UP: undefined,
+  THUMBS_DOWN: undefined,
+  PINCH: undefined,
+  OPEN_PALM: undefined,
+  POINTING: undefined,
+  OK: undefined,
+  FIST: undefined,
+  NONE: undefined,
+}
+
 const GESTURE_META: Record<GestureKey, { emoji: string; label: string; action: string }> = {
-  THUMBS_UP:   { emoji: "👍", label: "Thumbs Up",     action: "Turn ON active device" },
-  THUMBS_DOWN: { emoji: "👎", label: "Thumbs Down",   action: "Turn OFF active device" },
-  PINCH:       { emoji: "🤌", label: "Pinch",          action: "Increase value (brightness/speed/vol/temp)" },
+  THUMBS_UP:   { emoji: "👍", label: "Thumbs Up",     action: "Increase value" },
+  THUMBS_DOWN: { emoji: "👎", label: "Thumbs Down",   action: "Decrease value" },
+  PINCH:       { emoji: "🤌", label: "Pinch",          action: "Step up / next" },
   OPEN_PALM:   { emoji: "🖐", label: "Open Palm",      action: "Turn OFF ALL devices" },
-  PEACE:       { emoji: "✌️", label: "Peace",           action: "Cycle to next device" },
-  POINTING:    { emoji: "☝️", label: "Pointing",        action: "Cycle to previous device" },
-  ROCK:        { emoji: "🤘", label: "Rock",            action: "Next track / channel +" },
-  OK:          { emoji: "👌", label: "OK",              action: "Decrease value (brightness/speed/vol/temp)" },
-  THREE:       { emoji: "🤟", label: "Three Fingers",  action: "Volume / speed step up" },
-  CALL_ME:     { emoji: "🤙", label: "Call Me",        action: "Mute / mode switch" },
-  FOUR:        { emoji: "🖖", label: "Four Fingers",   action: "Toggle Speaker" },
-  FIST:        { emoji: "✊", label: "Fist",            action: "Confirm / hold" },
+  PEACE:       { emoji: "✌️", label: "Peace",           action: "Toggle AC" },
+  POINTING:    { emoji: "☝️", label: "Pointing",        action: "Cycle device" },
+  ROCK:        { emoji: "🤘", label: "Rock",            action: "Toggle TV" },
+  OK:          { emoji: "👌", label: "OK",              action: "Step down / prev" },
+  THREE:       { emoji: "🤟", label: "Three Fingers",  action: "Toggle Light" },
+  CALL_ME:     { emoji: "🤙", label: "Call Me",        action: "Toggle Speaker" },
+  FOUR:        { emoji: "🖖", label: "Four Fingers",   action: "Toggle Fan" },
+  FIST:        { emoji: "✊", label: "Fist",            action: "Cycle device" },
   NONE:        { emoji: "✋", label: "No Gesture",     action: "—" },
 }
 
@@ -199,259 +222,577 @@ function DeviceCard({ name, dev, isActive, onToggle, onAction, onSelect }: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ControlPage() {
-  const [devices, setDevices]       = useState<DevicesState | null>(null)
+  const [devices, setDevices]       = useState<DevicesState>(INITIAL_DEVICES)
   const [activeIdx, setActiveIdx]   = useState(0)
-  const [connected, setConnected]   = useState(true)
-  const [rawGesture, setRawGesture] = useState("None")
+  const [connected, setConnected]   = useState(false)
   const [confidence, setConf]       = useState(0)
   const [gesture, setGesture]       = useState<GestureKey>("NONE")
-  const [lastAction, setLastAction] = useState("")
+  const [leftGesture, setLeftGesture] = useState<GestureKey>("NONE")
+  const [rightGesture, setRightGesture] = useState<GestureKey>("NONE")
+  const [leftConfidence, setLeftConf] = useState(0)
+  const [rightConfidence, setRightConf] = useState(0)
+  const [bothHandsDetected, setBothHandsDetected] = useState(false)
   const [actionLog, setActionLog]   = useState<string[]>([])
   const [camOn, setCamOn]           = useState(false)
 
   const activeDevice = DEVICE_ORDER[activeIdx]
   const lastGstRef   = useRef<GestureKey>("NONE")
   const lastActTime  = useRef(0)
+  const videoRef     = useRef<HTMLVideoElement>(null)
+  const canvasRef    = useRef<HTMLCanvasElement>(null)
+  const requestRef   = useRef<number>(0)
+  const lastVideoTimeRef = useRef(-1)
+  
+  // Gesture stability tracking for improved accuracy - dual hand version
+  const leftHandStabilityRef = useRef<{ gesture: GestureKey; count: number; confidence: number }>({ gesture: "NONE", count: 0, confidence: 0 })
+  const rightHandStabilityRef = useRef<{ gesture: GestureKey; count: number; confidence: number }>({ gesture: "NONE", count: 0, confidence: 0 })
+  const lastLeftActTimeRef = useRef(0)
+  const lastRightActTimeRef = useRef(0)
+  const STABILITY_THRESHOLD = 5 // Require gesture detected 5 frames in a row for dual-hand mode
+  const CONFIDENCE_THRESHOLD = 0.7 // Require 70% confidence for dual-hand mode
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const fetchDevices = useCallback(async () => {
-    try {
-      const res  = await fetch(`${API}/devices`)
-      const data = await res.json() as DevicesState
-      setDevices(data); setConnected(true)
-    } catch { setConnected(false) }
+  // ── Local Device Handlers ─────────────────────────────────────────────────
+  const postLocal = useCallback((device: DeviceName, action: string, value?: number, svalue?: string) => {
+    setDevices(prev => {
+      const state = { ...prev }
+      const dev = { ...state[device] } as any
+      if (action === "toggle") dev.status = dev.status === "ON" ? "OFF" : "ON"
+      if (action === "set_brightness") dev.brightness = value
+      if (action === "set_speed") dev.speed = value
+      if (action === "set_channel") dev.channel = value
+      if (action === "set_volume") dev.volume = value
+      if (action === "set_temperature") dev.temperature = value
+      if (action === "set_mode") dev.mode = svalue
+      if (action === "next_track") dev.track += 1
+      if (action === "prev_track") dev.track = Math.max(1, dev.track - 1)
+      state[device] = dev
+      return state
+    })
   }, [])
 
-  const post = useCallback(async (device: DeviceName, action: string, value?: number, svalue?: string) => {
-    try {
-      await fetch(`${API}/control`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device, action, value, svalue }),
-      })
-      await fetchDevices()
-    } catch { /* ignore */ }
-  }, [fetchDevices])
+  const allOffLocal = useCallback(() => {
+    setDevices(prev => {
+      const state = { ...prev }
+      for (const k of DEVICE_ORDER) {
+        state[k] = { ...state[k], status: "OFF" } as any
+      }
+      return state
+    })
+  }, [])
 
-  const allOff = useCallback(async () => {
-    try { await fetch(`${API}/all_off`, { method: "POST" }); await fetchDevices() }
-    catch { /* ignore */ }
-  }, [fetchDevices])
+  const handleToggle = (d: DeviceName)                             => postLocal(d, "toggle")
+  const handleAction = (d: DeviceName, a: string, v?: number, sv?: string) => postLocal(d, a, v, sv)
 
-  const handleToggle = (d: DeviceName)                             => post(d, "toggle")
-  const handleAction = (d: DeviceName, a: string, v?: number, sv?: string) => post(d, a, v, sv)
+  const handleGestureAction = useCallback((key: GestureKey) => {
+    if (key === "NONE") { lastGstRef.current = "NONE"; return }
 
-  // ── Gesture polling ───────────────────────────────────────────────────────
-  useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const res  = await fetch(`${API}/gesture`)
-        const data = await res.json() as { gesture: string; confidence: number }
-        setRawGesture(data.gesture)
-        setConf(data.confidence)
-        const key = gestureKey(data.gesture)
-        setGesture(key)
+    const now = Date.now()
+    const cooldownOk = now - lastActTime.current > COOLDOWN_MS
+    if (key === lastGstRef.current && !cooldownOk) return
+    // Non-repeating gestures (fire once per hold)
+    if (!["PINCH", "OK", "THUMBS_UP", "THUMBS_DOWN"].includes(key) && key === lastGstRef.current) return
 
-        if (key === "NONE") { lastGstRef.current = "NONE"; return }
+    lastGstRef.current = key
+    lastActTime.current = now
 
-        const now = Date.now()
-        const cooldownOk = now - lastActTime.current > COOLDOWN_MS
-        if (key === lastGstRef.current && !cooldownOk) return
-        // Non-repeating gestures (fire once per hold)
-        if (!["PINCH", "OK", "ROCK", "THREE"].includes(key) && key === lastGstRef.current) return
+    let logMsg = ""
 
-        lastGstRef.current = key
-        lastActTime.current = now
+    setDevices(prev => {
+      const state = { ...prev }
+      const devName = activeDevice as DeviceName
+      const devState = { ...state[devName] } as any
 
+      // Check if this gesture is a direct device toggle
+      const deviceToToggle = GESTURE_TO_DEVICE[key]
+      if (deviceToToggle) {
+        const devToToggle = { ...state[deviceToToggle] } as any
+        devToToggle.status = devToToggle.status === "ON" ? "OFF" : "ON"
+        state[deviceToToggle] = devToToggle
+        logMsg = `${GESTURE_META[key].emoji} Toggle ${deviceToToggle}: ${devToToggle.status}`
+        return state
+      }
+
+      switch (key) {
+        case "THUMBS_UP":
+          devState.brightness = Math.min(100, devState.brightness + 10)
+          logMsg = `👍 Brightness → ${devState.brightness}%`
+          break
+
+        case "THUMBS_DOWN":
+          devState.brightness = Math.max(1, devState.brightness - 10)
+          logMsg = `👎 Brightness → ${devState.brightness}%`
+          break
+
+        case "OPEN_PALM":
+          logMsg = "🖐 All devices OFF"
+          for (const k of DEVICE_ORDER) {
+            state[k] = { ...state[k], status: "OFF" } as any
+          }
+          break
+
+        case "POINTING": {
+          const nextIdx = (activeIdx + 1) % DEVICE_ORDER.length
+          setActiveIdx(nextIdx)
+          logMsg = `☝️ → ${DEVICE_ORDER[nextIdx] as DeviceName}`
+          break
+        }
+
+        case "PINCH": {
+          if (devName === "light") {
+            devState.brightness = devState.brightness >= 100 ? 10 : Math.min(100, devState.brightness + 10)
+            logMsg = `🤌 Brightness → ${devState.brightness}%`
+          } else if (devName === "fan") {
+            devState.speed = devState.speed >= 5 ? 1 : devState.speed + 1
+            logMsg = `🤌 Fan speed → ${devState.speed}`
+          } else if (devName === "tv") {
+            devState.volume = Math.min(100, devState.volume + 10)
+            logMsg = `🤌 TV Vol → ${devState.volume}`
+          } else if (devName === "ac") {
+            devState.temperature = Math.min(30, devState.temperature + 1)
+            logMsg = `🤌 AC Temp → ${devState.temperature}°C`
+          } else if (devName === "speaker") {
+            devState.volume = Math.min(100, devState.volume + 10)
+            logMsg = `🤌 Speaker Vol → ${devState.volume}`
+          }
+          break
+        }
+
+        case "OK": {
+          if (devName === "light") {
+            devState.brightness = Math.max(1, devState.brightness - 10)
+            logMsg = `👌 Brightness → ${devState.brightness}%`
+          } else if (devName === "fan") {
+            devState.speed = devState.speed <= 1 ? 5 : devState.speed - 1
+            logMsg = `👌 Fan speed → ${devState.speed}`
+          } else if (devName === "tv") {
+            devState.volume = Math.max(0, devState.volume - 10)
+            logMsg = `👌 TV Vol → ${devState.volume}`
+          } else if (devName === "ac") {
+            devState.temperature = Math.max(16, devState.temperature - 1)
+            logMsg = `👌 AC Temp → ${devState.temperature}°C`
+          } else if (devName === "speaker") {
+            devState.volume = Math.max(0, devState.volume - 10)
+            logMsg = `👌 Speaker Vol → ${devState.volume}`
+          }
+          break
+        }
+
+        case "FIST": {
+          if (devName === "tv") {
+            logMsg = `✊ TV CH+`
+            devState.channel += 1
+          } else if (devName === "speaker") {
+            logMsg = `✊ Next track`
+            devState.track += 1
+          }
+          break
+        }
+
+        default:
+          return state
+      }
+
+      state[devName] = devState
+      return state
+    })
+
+    if (logMsg) {
+      setActionLog(prev => [...prev.slice(-9), logMsg])
+    }
+  }, [activeIdx])
+
+  // ── Left Hand Handler: Device Selection ────────────────────────────────────
+  const handleLeftHandGesture = useCallback((key: GestureKey) => {
+    if (key === "NONE") {
+      leftHandStabilityRef.current = { gesture: "NONE", count: 0, confidence: 0 }
+      return
+    }
+
+    const now = Date.now()
+    const cooldownOk = now - lastLeftActTimeRef.current > COOLDOWN_MS
+    if (key === leftHandStabilityRef.current.gesture && !cooldownOk) return
+
+    lastLeftActTimeRef.current = now
+
+    let logMsg = ""
+
+    // Left hand controls device selection
+    switch (key) {
+      case "THREE":
+        setActiveIdx(DEVICE_ORDER.indexOf("light"))
+        logMsg = `🖐 LEFT: Select Light`
+        break
+      case "FOUR":
+        setActiveIdx(DEVICE_ORDER.indexOf("fan"))
+        logMsg = `🖐 LEFT: Select Fan`
+        break
+      case "ROCK":
+        setActiveIdx(DEVICE_ORDER.indexOf("tv"))
+        logMsg = `🖐 LEFT: Select TV`
+        break
+      case "PEACE":
+        setActiveIdx(DEVICE_ORDER.indexOf("ac"))
+        logMsg = `🖐 LEFT: Select AC`
+        break
+      case "CALL_ME":
+        setActiveIdx(DEVICE_ORDER.indexOf("speaker"))
+        logMsg = `🖐 LEFT: Select Speaker`
+        break
+      case "OPEN_PALM":
+        logMsg = "🖐 All devices OFF"
         setDevices(prev => {
-          if (!prev) return prev
-          const dev = activeDevice as DeviceName
-          const devState = prev[dev]
-          let logMsg = ""
-
-
-          switch (key) {
-            case "THUMBS_UP":
-              if (devState.status === "OFF") {
-                logMsg = `👍 Turn ON ${dev}`
-                post(dev, "toggle")
-              }
-              break
-
-            case "THUMBS_DOWN":
-              if (devState.status === "ON") {
-                logMsg = `👎 Turn OFF ${dev}`
-                post(dev, "toggle")
-              }
-              break
-
-            case "OPEN_PALM":
-              logMsg = "🖐 All devices OFF"
-              allOff()
-              break
-
-            case "PEACE": {
-              // Cycle to next device
-              const nextIdx = (activeIdx + 1) % DEVICE_ORDER.length
-              setActiveIdx(nextIdx)
-              logMsg = `✌️ → ${DEVICE_ORDER[nextIdx] as DeviceName}`
-              break
-            }
-
-            case "POINTING": {
-              const prevIdx = (activeIdx - 1 + DEVICE_ORDER.length) % DEVICE_ORDER.length
-              setActiveIdx(prevIdx)
-              logMsg = `☝️ → ${DEVICE_ORDER[prevIdx] as DeviceName}`
-              break
-            }
-
-            case "FOUR":
-              // Toggle speaker
-              logMsg = `🖖 Toggle speaker`
-              post("speaker", "toggle")
-              break
-
-            case "PINCH": {
-              // Step primary value UP
-              if (dev === "light") {
-                const cur = (devState as LightDevice).brightness
-                const next = cur >= 100 ? 10 : Math.min(100, cur + 10)
-                logMsg = `🤌 Brightness → ${next}%`
-                post(dev, "set_brightness", next)
-              } else if (dev === "fan") {
-                const cur = (devState as FanDevice).speed
-                const next = cur >= 5 ? 1 : cur + 1
-                logMsg = `🤌 Fan speed → ${next}`
-                post(dev, "set_speed", next)
-              } else if (dev === "tv") {
-                const cur = (devState as TvDevice).volume
-                const next = Math.min(100, cur + 10)
-                logMsg = `🤌 TV Vol → ${next}`
-                post(dev, "set_volume", next)
-              } else if (dev === "ac") {
-                const cur = (devState as AcDevice).temperature
-                const next = Math.min(30, cur + 1)
-                logMsg = `🤌 AC Temp → ${next}°C`
-                post(dev, "set_temperature", next)
-              } else if (dev === "speaker") {
-                const cur = (devState as SpeakerDevice).volume
-                const next = Math.min(100, cur + 10)
-                logMsg = `🤌 Speaker Vol → ${next}`
-                post(dev, "set_volume", next)
-              }
-              break
-            }
-
-            case "OK": {
-              // Step primary value DOWN
-              if (dev === "light") {
-                const cur = (devState as LightDevice).brightness
-                const next = Math.max(1, cur - 10)
-                logMsg = `👌 Brightness → ${next}%`
-                post(dev, "set_brightness", next)
-              } else if (dev === "fan") {
-                const cur = (devState as FanDevice).speed
-                const next = cur <= 1 ? 5 : cur - 1
-                logMsg = `👌 Fan speed → ${next}`
-                post(dev, "set_speed", next)
-              } else if (dev === "tv") {
-                const cur = (devState as TvDevice).volume
-                const next = Math.max(0, cur - 10)
-                logMsg = `👌 TV Vol → ${next}`
-                post(dev, "set_volume", next)
-              } else if (dev === "ac") {
-                const cur = (devState as AcDevice).temperature
-                const next = Math.max(16, cur - 1)
-                logMsg = `👌 AC Temp → ${next}°C`
-                post(dev, "set_temperature", next)
-              } else if (dev === "speaker") {
-                const cur = (devState as SpeakerDevice).volume
-                const next = Math.max(0, cur - 10)
-                logMsg = `👌 Speaker Vol → ${next}`
-                post(dev, "set_volume", next)
-              }
-              break
-            }
-
-            case "ROCK":
-              if (dev === "tv") {
-                logMsg = `🤘 TV CH+`
-                post(dev, "set_channel", (devState as TvDevice).channel + 1)
-              } else if (dev === "speaker") {
-                logMsg = `🤘 Next track`
-                post(dev, "next_track")
-              }
-              break
-
-            case "CALL_ME":
-              if (dev === "speaker") {
-                logMsg = `🤙 Prev track`
-                post(dev, "prev_track")
-              } else if (dev === "tv") {
-                logMsg = `🤙 TV CH-`
-                post(dev, "set_channel", Math.max(1, (devState as TvDevice).channel - 1))
-              }
-              break
-
-            case "THREE":
-              if (dev === "fan") {
-                const cur = (devState as FanDevice).speed
-                const next = Math.min(5, cur + 1)
-                logMsg = `🤟 Fan speed → ${next}`
-                post(dev, "set_speed", next)
-              } else if (dev === "speaker") {
-                const cur = (devState as SpeakerDevice).volume
-                const next = Math.min(100, cur + 5)
-                logMsg = `🤟 Speaker Vol → ${next}`
-                post(dev, "set_volume", next)
-              }
-              break
+          const state = { ...prev }
+          for (const k of DEVICE_ORDER) {
+            state[k] = { ...state[k], status: "OFF" } as any
           }
-
-          if (logMsg) {
-            setLastAction(logMsg)
-            setActionLog(log => [logMsg, ...log].slice(0, 8))
-          }
-          return prev
+          return state
         })
-      } catch { setConnected(false) }
-    }, POLL_GESTURE)
-    return () => clearInterval(id)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDevice, activeIdx, post, allOff])
+        break
+      default:
+        return
+    }
 
-  useEffect(() => {
-    fetchDevices()
-    const id = setInterval(fetchDevices, POLL_DEVICES)
-    return () => clearInterval(id)
-  }, [fetchDevices])
-
-  useEffect(() => {
-    let mounted = true
-    fetch(`${API}/camera/status`).then(r => r.json()).then(j => { if (mounted) setCamOn(!!j.running) }).catch(() => {})
-    return () => { mounted = false }
+    if (logMsg) {
+      setActionLog(prev => [...prev.slice(-9), logMsg])
+    }
   }, [])
 
-  if (!devices) return <div style={s.loading}>Connecting to backend…</div>
+  // ── Right Hand Handler: Device Control ─────────────────────────────────────
+  const handleRightHandGesture = useCallback((key: GestureKey) => {
+    if (key === "NONE") {
+      rightHandStabilityRef.current = { gesture: "NONE", count: 0, confidence: 0 }
+      return
+    }
+
+    const now = Date.now()
+    const cooldownOk = now - lastRightActTimeRef.current > COOLDOWN_MS
+    if (key === rightHandStabilityRef.current.gesture && !cooldownOk) return
+    // Non-repeating gestures (fire once per hold)
+    if (!["PINCH", "OK", "THUMBS_UP", "THUMBS_DOWN"].includes(key) && key === rightHandStabilityRef.current.gesture) return
+
+    rightHandStabilityRef.current.gesture = key
+    lastRightActTimeRef.current = now
+
+    let logMsg = ""
+
+    setDevices(prev => {
+      const state = { ...prev }
+      const devName = activeDevice as DeviceName
+      const devState = { ...state[devName] } as any
+
+      switch (key) {
+        case "THUMBS_UP":
+          if (devName === "light") {
+            devState.brightness = Math.min(100, devState.brightness + 10)
+            logMsg = `👍 RIGHT: Brightness → ${devState.brightness}%`
+          } else if (devName === "fan") {
+            devState.speed = Math.min(5, devState.speed + 1)
+            logMsg = `👍 RIGHT: Fan speed → ${devState.speed}`
+          } else if (devName === "tv") {
+            devState.volume = Math.min(100, devState.volume + 10)
+            logMsg = `👍 RIGHT: TV Vol → ${devState.volume}%`
+          } else if (devName === "ac") {
+            devState.temperature = Math.min(30, devState.temperature + 1)
+            logMsg = `👍 RIGHT: AC Temp → ${devState.temperature}°C`
+          } else if (devName === "speaker") {
+            devState.volume = Math.min(100, devState.volume + 10)
+            logMsg = `👍 RIGHT: Speaker Vol → ${devState.volume}%`
+          }
+          break
+
+        case "THUMBS_DOWN":
+          if (devName === "light") {
+            devState.brightness = Math.max(1, devState.brightness - 10)
+            logMsg = `👎 RIGHT: Brightness → ${devState.brightness}%`
+          } else if (devName === "fan") {
+            devState.speed = Math.max(1, devState.speed - 1)
+            logMsg = `👎 RIGHT: Fan speed → ${devState.speed}`
+          } else if (devName === "tv") {
+            devState.volume = Math.max(0, devState.volume - 10)
+            logMsg = `👎 RIGHT: TV Vol → ${devState.volume}%`
+          } else if (devName === "ac") {
+            devState.temperature = Math.max(16, devState.temperature - 1)
+            logMsg = `👎 RIGHT: AC Temp → ${devState.temperature}°C`
+          } else if (devName === "speaker") {
+            devState.volume = Math.max(0, devState.volume - 10)
+            logMsg = `👎 RIGHT: Speaker Vol → ${devState.volume}%`
+          }
+          break
+
+        case "PINCH":
+          if (devName === "light") {
+            devState.brightness = devState.brightness >= 100 ? 10 : Math.min(100, devState.brightness + 10)
+            logMsg = `🤌 RIGHT: Brightness → ${devState.brightness}%`
+          } else if (devName === "fan") {
+            devState.speed = devState.speed >= 5 ? 1 : devState.speed + 1
+            logMsg = `🤌 RIGHT: Fan speed → ${devState.speed}`
+          } else if (devName === "tv") {
+            devState.channel = devState.channel + 1
+            logMsg = `🤌 RIGHT: TV CH → ${devState.channel}`
+          } else if (devName === "ac") {
+            devState.temperature = Math.min(30, devState.temperature + 1)
+            logMsg = `🤌 RIGHT: AC Temp → ${devState.temperature}°C`
+          } else if (devName === "speaker") {
+            devState.track = devState.track + 1
+            logMsg = `🤌 RIGHT: Next track`
+          }
+          break
+
+        case "OK":
+          if (devName === "light") {
+            devState.brightness = Math.max(1, devState.brightness - 10)
+            logMsg = `👌 RIGHT: Brightness → ${devState.brightness}%`
+          } else if (devName === "fan") {
+            devState.speed = devState.speed <= 1 ? 5 : devState.speed - 1
+            logMsg = `👌 RIGHT: Fan speed → ${devState.speed}`
+          } else if (devName === "tv") {
+            devState.channel = Math.max(1, devState.channel - 1)
+            logMsg = `👌 RIGHT: TV CH → ${devState.channel}`
+          } else if (devName === "ac") {
+            devState.temperature = Math.max(16, devState.temperature - 1)
+            logMsg = `👌 RIGHT: AC Temp → ${devState.temperature}°C`
+          } else if (devName === "speaker") {
+            devState.track = Math.max(1, devState.track - 1)
+            logMsg = `👌 RIGHT: Prev track`
+          }
+          break
+
+        default:
+          return state
+      }
+
+      state[devName] = devState
+      return state
+    })
+
+    if (logMsg) {
+      setActionLog(prev => [...prev.slice(-9), logMsg])
+    }
+  }, [activeIdx])
+
+  // ── Camera and Gesture Recognition (Dual Hand) ───────────────────────────
+  useEffect(() => {
+    let mounted = true;
+    async function setupCamera() {
+      try {
+        await initGestureRecognizer();
+        if (!mounted) return;
+        setConnected(true);
+      } catch (e) {
+        console.error("GestureRecognizer init error:", e);
+      }
+    }
+    setupCamera();
+
+    return () => {
+      mounted = false;
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  const predictWebcam = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const recognizer = getGestureRecognizer();
+    
+    if (video && canvas && recognizer && video.readyState >= 2) {
+      if (video.currentTime !== lastVideoTimeRef.current) {
+        lastVideoTimeRef.current = video.currentTime;
+        
+        const nowInMs = Date.now();
+        const results = recognizer.recognizeForVideo(video, nowInMs);
+
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.save();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          if (results.landmarks && results.landmarks.length > 0) {
+            // Draw landmarks for both hands with different colors
+            results.landmarks.forEach((landmarks, idx) => {
+              ctx.fillStyle = idx === 0 ? "#a78bfa" : "#67e8f9"; // Purple for left, cyan for right
+              for (const lm of landmarks) {
+                ctx.beginPath();
+                ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 4, 0, 2 * Math.PI);
+                ctx.fill();
+              }
+            });
+          }
+          ctx.restore();
+        }
+
+        // Detect dual-hand gestures
+        const dualGestures = detectDualHandGestures(results);
+
+        if (!dualGestures.bothHandsDetected) {
+          // Both hands not detected, reset
+          leftHandStabilityRef.current = { gesture: "NONE", count: 0, confidence: 0 };
+          rightHandStabilityRef.current = { gesture: "NONE", count: 0, confidence: 0 };
+          setLeftGesture("NONE");
+          setRightGesture("NONE");
+          setLeftConf(0);
+          setRightConf(0);
+          setBothHandsDetected(false);
+          setGesture("NONE");
+          setConf(0);
+        } else {
+          setBothHandsDetected(true);
+
+          // Process left hand gesture (device selection)
+          const leftGestureKey = dualGestures.leftGesture ? gestureKey(dualGestures.leftGesture) : "NONE";
+          
+          if (leftGestureKey === "NONE" || dualGestures.leftConfidence < CONFIDENCE_THRESHOLD) {
+            leftHandStabilityRef.current = { gesture: "NONE", count: 0, confidence: 0 };
+            setLeftGesture("NONE");
+            setLeftConf(0);
+          } else {
+            if (leftGestureKey === leftHandStabilityRef.current.gesture) {
+              leftHandStabilityRef.current.count += 1;
+              leftHandStabilityRef.current.confidence = Math.max(leftHandStabilityRef.current.confidence, dualGestures.leftConfidence);
+              
+              if (leftHandStabilityRef.current.count >= STABILITY_THRESHOLD) {
+                setLeftGesture(leftGestureKey);
+                setLeftConf(leftHandStabilityRef.current.confidence);
+                handleLeftHandGesture(leftGestureKey);
+              }
+            } else {
+              leftHandStabilityRef.current = { gesture: leftGestureKey, count: 1, confidence: dualGestures.leftConfidence };
+              setLeftGesture(leftGestureKey);
+              setLeftConf(dualGestures.leftConfidence);
+            }
+          }
+
+          // Process right hand gesture (device control)
+          const rightGestureKey = dualGestures.rightGesture ? gestureKey(dualGestures.rightGesture) : "NONE";
+          
+          if (rightGestureKey === "NONE" || dualGestures.rightConfidence < CONFIDENCE_THRESHOLD) {
+            rightHandStabilityRef.current = { gesture: "NONE", count: 0, confidence: 0 };
+            setRightGesture("NONE");
+            setRightConf(0);
+          } else {
+            if (rightGestureKey === rightHandStabilityRef.current.gesture) {
+              rightHandStabilityRef.current.count += 1;
+              rightHandStabilityRef.current.confidence = Math.max(rightHandStabilityRef.current.confidence, dualGestures.rightConfidence);
+              
+              if (rightHandStabilityRef.current.count >= STABILITY_THRESHOLD) {
+                setRightGesture(rightGestureKey);
+                setRightConf(rightHandStabilityRef.current.confidence);
+                handleRightHandGesture(rightGestureKey);
+              }
+            } else {
+              rightHandStabilityRef.current = { gesture: rightGestureKey, count: 1, confidence: dualGestures.rightConfidence };
+              setRightGesture(rightGestureKey);
+              setRightConf(dualGestures.rightConfidence);
+            }
+          }
+
+          // Display the most recent gesture for UI
+          if (rightGestureKey !== "NONE") {
+            setGesture(rightGestureKey);
+            setConf(dualGestures.rightConfidence);
+          } else if (leftGestureKey !== "NONE") {
+            setGesture(leftGestureKey);
+            setConf(dualGestures.leftConfidence);
+          }
+        }
+      }
+    }
+    
+    if (camOn) {
+      requestRef.current = requestAnimationFrame(predictWebcam);
+    }
+  }, [camOn, handleLeftHandGesture, handleRightHandGesture]);
+
+  useEffect(() => {
+    if (camOn) {
+      navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+        .then(stream => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current?.play();
+              predictWebcam();
+            };
+          }
+        })
+        .catch(console.error);
+    } else {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+        videoRef.current.srcObject = null;
+      }
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext("2d");
+        ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+      setGesture("NONE");
+      setLeftGesture("NONE");
+      setRightGesture("NONE");
+      setConf(0);
+      setLeftConf(0);
+      setRightConf(0);
+      setBothHandsDetected(false);
+    }
+  }, [camOn, predictWebcam]);
+
+  const toggleCamera = () => {
+    setCamOn(prev => !prev);
+  }
+
+  if (!devices) return <div style={s.loading}>Loading devices…</div>
 
   const gMeta = GESTURE_META[gesture] ?? GESTURE_META["NONE"]
+  const leftMeta = GESTURE_META[leftGesture] ?? GESTURE_META["NONE"]
+  const rightMeta = GESTURE_META[rightGesture] ?? GESTURE_META["NONE"]
 
   return (
     <main style={s.root}>
       {/* ── Header ── */}
       <header style={s.header}>
         <span style={s.logo}>🖐 GestureControl</span>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <ConfRing conf={confidence} />
-          <span style={s.gestureChip}>{gMeta.emoji} {gMeta.label}</span>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          {bothHandsDetected && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "#a78bfa" }}>LEFT</span>
+                <ConfRing conf={leftConfidence} />
+                <span style={s.gestureChip}>{leftMeta.emoji} {leftMeta.label}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "#67e8f9" }}>RIGHT</span>
+                <ConfRing conf={rightConfidence} />
+                <span style={s.gestureChip}>{rightMeta.emoji} {rightMeta.label}</span>
+              </div>
+            </>
+          )}
+          {!bothHandsDetected && (
+            <>
+              <ConfRing conf={confidence} />
+              <span style={s.gestureChip}>{gMeta.emoji} {gMeta.label}</span>
+            </>
+          )}
           <span style={{
             ...s.badge,
             background: connected ? "#00ff9520" : "#ff444420",
             border: `1px solid ${connected ? "#00ff95" : "#ff4444"}`,
             color:  connected ? "#00ff95" : "#ff4444",
           }}>
-            {connected ? "● Live" : "● Disconnected"}
+            {connected ? "● Model Ready" : "● Loading Model..."}
           </span>
+          {bothHandsDetected && (
+            <span style={{
+              ...s.badge,
+              background: "#00ff9520",
+              border: "1px solid #00ff95",
+              color: "#00ff95",
+            }}>
+              ✓ Both Hands Detected
+            </span>
+          )}
         </div>
       </header>
 
@@ -459,20 +800,17 @@ export default function ControlPage() {
         {/* ── Left: video + gesture info ── */}
         <div style={s.leftCol}>
           <div style={s.videoWrap}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${API}/video_feed`} alt="Live camera" style={s.video} />
-            <div style={s.videoLabel}>📷 Camera Feed</div>
-            <button onClick={async () => {
-              try {
-                if (camOn) {
-                  await fetch(`${API}/camera/stop`, { method: 'POST' })
-                  setCamOn(false)
-                } else {
-                  await fetch(`${API}/camera/start`, { method: 'POST' })
-                  setCamOn(true)
-                }
-              } catch (e) { /* ignore */ }
-            }} style={{ position: 'absolute', top: 8, right: 8, background: '#111126', color: '#fff', borderRadius: 8, padding: '6px 8px', fontSize: 12, border: '1px solid #2e2e4e', cursor: 'pointer' }}>{camOn ? 'Stop Camera' : 'Start Camera'}</button>
+            <video ref={videoRef} style={{...s.video, transform: "scaleX(-1)"}} playsInline muted />
+            <canvas ref={canvasRef} width={640} height={480} style={{...s.video, position: "absolute", top: 0, left: 0, transform: "scaleX(-1)"}} />
+            {!camOn && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#000", color: "#666" }}>
+                Camera is OFF
+              </div>
+            )}
+            <div style={s.videoLabel}>📷 Browser Camera</div>
+            <button onClick={toggleCamera} style={{ position: 'absolute', top: 8, right: 8, background: '#111126', color: '#fff', borderRadius: 8, padding: '6px 8px', fontSize: 12, border: '1px solid #2e2e4e', cursor: 'pointer' }}>
+              {camOn ? 'Stop Camera' : 'Start Camera'}
+            </button>
           </div>
 
           {/* Active gesture action hint */}
@@ -520,7 +858,7 @@ export default function ControlPage() {
         <div style={s.rightCol}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={s.sectionTitle}>Devices</div>
-            <button onClick={() => allOff()} style={s.allOffBtn}>🖐 All Off</button>
+            <button onClick={() => allOffLocal()} style={s.allOffBtn}>🖐 All Off</button>
           </div>
 
           <div style={s.cards}>

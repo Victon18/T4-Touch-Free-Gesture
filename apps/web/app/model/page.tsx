@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState, useRef } from "react"
+import { initGestureRecognizer, getGestureRecognizer, detectCustomGestures } from "@/lib/gesture"
 
 const GESTURES_LIST = [
   { emoji: "🖐", label: "Open Palm" },
@@ -14,39 +15,109 @@ const GESTURES_LIST = [
 
 export default function ModelPage() {
   const [gesture, setGesture]     = useState("...")
-  const [connected, setConnected] = useState(true)
+  const [connected, setConnected] = useState(false)
   const [fps, setFps]             = useState(0)
-  const frameCount = useRef(0)
-  const lastTick   = useRef(Date.now())
+  
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const requestRef = useRef<number>(0)
+  const lastVideoTimeRef = useRef(-1)
+  const framesRef = useRef(0)
+  const lastFpsTimeRef = useRef(Date.now())
 
-  /* Gesture polling */
   useEffect(() => {
-    const id = setInterval(async () => {
+    let mounted = true;
+    async function setup() {
       try {
-        const res  = await fetch("http://localhost:8000/gesture")
-        const data = await res.json()
-        setGesture(data.gesture)
-        setConnected(true)
-      } catch {
-        setConnected(false)
+        await initGestureRecognizer();
+        if (!mounted) return;
+        setConnected(true);
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play();
+            predictWebcam();
+          };
+        }
+      } catch (e) {
+        console.error(e);
+        setConnected(false);
       }
-    }, 200)
-    return () => clearInterval(id)
-  }, [])
-
-  /* FPS counter via load events on the img */
-  const handleImgLoad = () => {
-    frameCount.current++
-    const now  = Date.now()
-    const diff = now - lastTick.current
-    if (diff >= 1000) {
-      setFps(Math.round((frameCount.current * 1000) / diff))
-      frameCount.current = 0
-      lastTick.current   = now
     }
-  }
+    setup();
 
-  /* derive label without emoji for matching */
+    return () => {
+      mounted = false;
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  const predictWebcam = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const recognizer = getGestureRecognizer();
+    
+    if (video && canvas && recognizer && video.readyState >= 2) {
+      if (video.currentTime !== lastVideoTimeRef.current) {
+        lastVideoTimeRef.current = video.currentTime;
+        
+        const nowInMs = Date.now();
+        const results = recognizer.recognizeForVideo(video, nowInMs);
+
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.save();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          if (results.landmarks && results.landmarks.length > 0) {
+            for (const landmarks of results.landmarks) {
+              ctx.fillStyle = "#00ff00";
+              for (const lm of landmarks) {
+                ctx.beginPath();
+                ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 4, 0, 2 * Math.PI);
+                ctx.fill();
+              }
+            }
+          }
+          ctx.restore();
+        }
+
+        let detectedGesture = "None";
+        if (results.gestures && results.gestures.length > 0 && results.gestures[0] && results.gestures[0].length > 0 && results.gestures[0][0]) {
+          const categoryName = results.gestures[0][0].categoryName;
+          detectedGesture = categoryName;
+          if (detectedGesture === "None" && results.landmarks && results.landmarks.length > 0 && results.landmarks[0]) {
+            const custom = detectCustomGestures(results.landmarks[0]);
+            if (custom) detectedGesture = custom;
+          }
+        }
+        
+        if (detectedGesture === "Victory") detectedGesture = "Peace";
+        if (detectedGesture === "Pointing_Up") detectedGesture = "Pointing";
+        if (detectedGesture === "Thumb_Up") detectedGesture = "Thumbs Up";
+        if (detectedGesture === "Thumb_Down") detectedGesture = "Thumbs Down";
+        if (detectedGesture === "Closed_Fist") detectedGesture = "Fist";
+        if (detectedGesture === "Open_Palm") detectedGesture = "Open Palm";
+        if (detectedGesture === "ILoveYou") detectedGesture = "Rock";
+
+        setGesture(detectedGesture);
+
+        framesRef.current++;
+        const now = Date.now();
+        if (now - lastFpsTimeRef.current >= 1000) {
+          setFps(Math.round((framesRef.current * 1000) / (now - lastFpsTimeRef.current)));
+          framesRef.current = 0;
+          lastFpsTimeRef.current = now;
+        }
+      }
+    }
+    requestRef.current = requestAnimationFrame(predictWebcam);
+  };
+
   const gestureName = gesture.replace(/[^\w\s]/gu, "").trim()
 
   return (
@@ -68,12 +139,16 @@ export default function ModelPage() {
         {/* Video panel */}
         <div style={styles.videoCard}>
           <div style={styles.videoWrap}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="http://localhost:8000/video_feed"
-              alt="Live camera feed"
-              style={styles.video}
-              onLoad={handleImgLoad}
+            <video
+              ref={videoRef}
+              style={{...styles.video, transform: "scaleX(-1)"}} // mirror
+              playsInline
+            />
+            <canvas
+              ref={canvasRef}
+              width={640}
+              height={480}
+              style={{...styles.video, position: "absolute", top: 0, left: 0, transform: "scaleX(-1)"}} // mirror canvas too
             />
             {/* Overlay: gesture pill */}
             <div style={styles.overlay}>
@@ -81,7 +156,7 @@ export default function ModelPage() {
               <span style={styles.fpsBadge}>{fps} fps</span>
             </div>
           </div>
-          <p style={styles.hint}>Hand landmarks are drawn in real-time by the backend</p>
+          <p style={styles.hint}>Hand landmarks are drawn in real-time in the browser</p>
         </div>
 
         {/* Sidebar */}
@@ -253,3 +328,4 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center",
   },
 }
+
