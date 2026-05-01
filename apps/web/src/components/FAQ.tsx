@@ -1,169 +1,162 @@
-'use client'
+'use client';
 
-import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
-import DotField from "./reactbits/DotField";
 
 const faqs = [
   {
-    question: 'What hardware do I need?',
-    answer: 'You only need a standard webcam connected to your computer. T4 works with any modern desktop or laptop that has a webcam and runs Windows or Linux.'
+    question: 'Does it work without special hardware?',
+    answer: 'Yes! Gestura runs entirely using your standard built-in or external webcam. No depth cameras, infrared sensors, or wearables are required.',
   },
   {
-    question: 'Is my data secure and private?',
-    answer: 'Absolutely. All processing happens locally on your device. No video, images, or data is sent to any external server. Your privacy is our top priority.'
+    question: 'Which gestures are supported out of the box?',
+    answer: 'Pinch, Swipe Left/Right/Up/Down, Open Hand, Closed Fist, and Peace Sign — mapping directly to common actions like scrolling, swiping, and media control.',
   },
   {
-    question: 'How accurate are the gesture recognitions?',
-    answer: 'T4 uses advanced AI hand tracking models that achieve high accuracy in standard lighting conditions. Accuracy depends on camera resolution, lighting, and hand position relative to the camera.'
+    question: 'Can I create my own custom gestures?',
+    answer: 'Absolutely. The built-in training module lets you record a new hand motion, name it, and bind it to any keyboard shortcut or system command.',
   },
   {
-    question: 'Does it work in low light?',
-    answer: 'T4 performs best in well-lit environments similar to natural office lighting. Very dark conditions may reduce accuracy. We recommend adequate lighting for optimal performance.'
+    question: 'How accurate is the AI gesture detection?',
+    answer: 'Our optimised neural network runs at up to 60 fps, ensuring ultra-low latency and pinpoint accuracy even when your hands move quickly.',
   },
   {
-    question: 'Can I use multiple hands at once?',
-    answer: 'Currently, T4 is optimized for single-hand interaction. Multi-hand support is on our roadmap for future releases.'
+    question: 'Does it work in low-light conditions?',
+    answer: 'Yes, the model is trained on diverse lighting datasets. As long as the camera can reasonably capture the outline of your hand, Gestura will track reliably.',
   },
   {
-    question: 'What operating systems are supported?',
-    answer: 'T4 is available for Windows and Linux. macOS support is planned for upcoming releases.'
+    question: 'Is my camera feed stored or sent anywhere?',
+    answer: 'No. Privacy is our top priority. All AI processing happens locally on your machine. Your camera feed never leaves your device.',
   },
   {
-    question: 'Is there a free version?',
-    answer: 'Yes! T4 is completely free and open-source. You can download it for free and use all features without any limitations or premium tiers.'
+    question: 'Which platforms does it support?',
+    answer: 'Currently Windows and macOS. A Linux version and mobile companions for iOS and Android are actively in development.',
   },
   {
-    question: 'How much processing power does it need?',
-    answer: 'T4 is optimized to run efficiently on mid-range consumer hardware. It typically uses 5-15% CPU on modern processors while maintaining real-time performance.'
-  }
+    question: 'How is this different from built-in gesture shortcuts in Windows/Mac?',
+    answer: 'Native OS shortcuts require a physical trackpad. Gestura is completely touch-free, works through the air, and supports fully customisable mappings far beyond what native OSes offer.',
+  },
 ];
 
-const FAQ = () => {
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+export default function FAQ() {
+  const [open, setOpen] = useState<number | null>(null);
 
   return (
-<>
+    <section className="w-full py-24 bg-black relative border-t border-white/5">
+      {/* background glow */}
+      <div
+        className="pointer-events-none absolute top-0 right-0 w-1/2 h-96 -z-10"
+        style={{ background: 'radial-gradient(ellipse at top right,rgba(139,92,246,0.12),transparent 70%)' }}
+      />
 
-    <div className="w-full h-full bg-neutral-900 relative z-10 overflow-hidden"
-      style={{
-        background: '#111111', // 👈 gray background
-        position: 'relative',
-        zIndex: 5
-      }}
->
-  <DotField
-    dotRadius={1.5}
-    dotSpacing={14}
-    bulgeStrength={67}
-    glowRadius={160}
-    sparkle={false}
-    waveAmplitude={0}
-    cursorRadius={500}
-    cursorForce={0.1}
-    bulgeOnly
-    gradientFrom="#A855F7"
-    gradientTo="#B497CF"
-    glowColor="#120F17"
-/>
-
-</div>
-</>
-  );
-};
-
-export default FAQ;
-
-        {/* Section header
-        <motion.div
-          className="text-center mb-16"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 0.6 }}
-        >
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            Frequently Asked Questions
-          </h2>
-          <p className="text-base sm:text-lg text-gray-300">
-            Everything you need to know about T4
-          </p>
-        </motion.div>
-
-        {/* FAQ Items }
-        <div className="space-y-3 sm:space-y-4">
-          {faqs.map((faq, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-100px' }}
-              transition={{ duration: 0.6, delay: index * 0.05 }}
+      <div className="container mx-auto px-6">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-3xl md:text-5xl font-bold text-white mb-4"
+          >
+            Frequently Asked{' '}
+            <span
+              style={{
+                backgroundImage: 'linear-gradient(90deg,#22d3ee,#8b5cf6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
             >
-              <button
-                onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
-                className="w-full text-left"
-              >
-                <div className="group relative w-full rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-900/50 to-gray-800/50 p-4 sm:p-6 hover:border-blue-500/50 transition-all duration-300 overflow-hidden">
-                  {/* Glow effect }
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-blue-500/5 to-purple-500/5" />
-
-                  {/* Content }
-                  <div className="relative flex items-center justify-between gap-4">
-                    <h3 className="text-base sm:text-lg font-semibold text-white group-hover:text-blue-300 transition-colors">
-                      {faq.question}
-                    </h3>
-                    <motion.div
-                      animate={{ rotate: expandedIndex === index ? 180 : 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="flex-shrink-0"
-                    >
-                      <ChevronDown size={24} className="text-blue-400" />
-                    </motion.div>
-                  </div>
-                </div>
-              </button>
-
-              {/* Answer }
-              <AnimatePresence>
-                {expandedIndex === index && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-4 sm:p-6 bg-gradient-to-br from-gray-900/30 to-gray-800/30 border-l-2 border-blue-500 mt-2 rounded-lg">
-                      <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
-                        {faq.answer}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          ))}
+              Questions
+            </span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-zinc-400 text-lg"
+          >
+            Everything you need to know about Gestura and how it works.
+          </motion.p>
         </div>
 
-        {/* Contact section }
-        <motion.div
-          className="mt-16 p-6 sm:p-8 rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-purple-500/10 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        >
-          <p className="text-white text-base sm:text-lg mb-4">
-            Didn&apos;t find your answer?
-          </p>
-          <a
-            href="mailto:support@t4gesture.com"
-            className="inline-block px-6 sm:px-8 py-2 sm:py-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-semibold transition-colors duration-300"
-          >
-            Contact Us
-          </a>
-        </motion.div>
-      </div> */}
+        <div className="max-w-3xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {faqs.map((faq, idx) => {
+            const isOpen = open === idx;
+            return (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.04 }}
+                style={{
+                  borderRadius: '16px',
+                  border: `1px solid ${isOpen ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  background: isOpen ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.03)',
+                  overflow: 'hidden',
+                  transition: 'border-color 0.2s,background 0.2s',
+                }}
+              >
+                <button
+                  onClick={() => setOpen(isOpen ? null : idx)}
+                  style={{
+                    width: '100%',
+                    padding: '20px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontWeight: 500,
+                      fontSize: '17px',
+                      color: isOpen ? '#22d3ee' : '#fff',
+                      transition: 'color 0.2s',
+                    }}
+                  >
+                    {faq.question}
+                  </span>
+                  <ChevronDown
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      color: isOpen ? '#22d3ee' : '#71717a',
+                      transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.3s,color 0.2s',
+                      flexShrink: 0,
+                      marginLeft: '12px',
+                    }}
+                  />
+                </button>
 
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      key="answer"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <p style={{ padding: '0 24px 20px', color: '#a1a1aa', lineHeight: '1.7', margin: 0 }}>
+                        {faq.answer}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}

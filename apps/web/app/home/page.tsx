@@ -1,27 +1,26 @@
-"use client";
-
-
-import FAQ from "@/components/FAQ";
-import Features from "@/components/Features";
-import Footer from "@/components/Footer";
-import HowItWorks from "@/components/HowItWorks";
-import UseCases from "@/components/UseCases";
+import type { Metadata } from 'next';
 import Hero from "@/components/Hero";
-import { motion } from "framer-motion";
+import UseCases from "@/components/UseCases";
+import HowItWorks from "@/components/HowItWorks";
+import FAQ from "@/components/FAQ";
+import Footer from "@/components/Footer";
+
+export const metadata: Metadata = {
+  title: 'Gestura | Control Everything. Touch Nothing.',
+  description: 'One AI-powered app that turns your hand gestures into actions. Touch-free control for media, slides, smart home, accessibility, and beyond.',
+  keywords: ['gesture control', 'AI hand tracking', 'hands-free', 'accessibility', 'smart home gestures', 'webcam hand tracking'],
+};
 
 export default function Home() {
   return (
-    <div className="w-full bg-black">
-      <section className="h-screen flex items-center justify-center bg-black">
+    <div className="w-full bg-black min-h-screen text-white font-sans selection:bg-cyan-500/30">
+      <main className="flex flex-col items-center justify-center w-full">
         <Hero />
-      </section>
-      <section className="h-screen flex items-center justify-center bg-black">
-          <UseCases />
-      </section>
-      <section className="h-screen flex items-center justify-center bg-black">
-          <FAQ />
-      </section>
-
+        <UseCases />
+        <HowItWorks />
+        <FAQ />
+      </main>
+      <Footer />
     </div>
   );
 }

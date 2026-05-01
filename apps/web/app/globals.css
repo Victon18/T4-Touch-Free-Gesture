@@ -1,10 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-big-shoulders {
-  font-family: 'Big Shoulders Display', sans-serif;
+@theme {
+  --font-sans: var(--font-sans);
 }
-html, body {
-  background: black;
+
+html,
+body {
+  background: #000;
+  color: #fff;
+  scroll-behavior: smooth;
+}
+
+.big-shoulders {
+  font-family: 'Big Shoulders Display', sans-serif;
 }

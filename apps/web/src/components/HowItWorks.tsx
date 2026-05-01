@@ -1,132 +1,101 @@
-'use client'
+'use client';
 
-import { motion } from 'motion/react';
-import { Camera, Brain, Gamepad2, Zap } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Camera, Settings2, Sparkles } from 'lucide-react';
 
 const steps = [
   {
-    step: 1,
-    icon: Camera,
-    title: 'Capture',
-    description: 'Your webcam captures hand movements in real-time',
+    num: '01',
+    title: 'Allow Camera Access',
+    description: 'Open the app and securely grant webcam access. All AI processing happens locally on your device.',
+    icon: <Camera className="w-8 h-8" style={{ color: '#22d3ee' }} />,
   },
   {
-    step: 2,
-    icon: Brain,
-    title: 'Detect',
-    description: 'AI models identify hand landmarks and gestures',
+    num: '02',
+    title: 'Choose or Build',
+    description: 'Pick a ready-made use case like Media Control, or train the app with your own custom gestures.',
+    icon: <Settings2 className="w-8 h-8" style={{ color: '#8b5cf6' }} />,
   },
   {
-    step: 3,
-    icon: Gamepad2,
-    title: 'Recognize',
-    description: 'System maps gestures to specific actions',
-  },
-  {
-    step: 4,
-    icon: Zap,
-    title: 'Control',
-    description: 'Your device responds instantly to your gestures',
+    num: '03',
+    title: 'Start Controlling',
+    description: 'Wave, pinch, or swipe. Experience seamless, hands-free control instantly.',
+    icon: <Sparkles className="w-8 h-8" style={{ color: '#22d3ee' }} />,
   },
 ];
 
-const HowItWorks = () => {
+export default function HowItWorks() {
   return (
-    <section className="relative w-full py-20 px-4 sm:px-6 lg:px-8 bg-black">
-      {/* Background gradient */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/2 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl transform translate-x-1/2" />
-        <div className="absolute top-1/4 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="relative max-w-7xl mx-auto">
-        {/* Section header */}
-        <motion.div 
-          className="text-center mb-16"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 0.6 }}
-        >
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            How It Works
-          </h2>
-          <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto">
-            A simple four-step process from gesture to action
-          </p>
-        </motion.div>
-
-        {/* Steps container */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-          {steps.map((item, index) => {
-            const Icon = item.icon;
-            return (
-              <motion.div
-                key={index}
-                className="relative"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-100px' }}
-                transition={{ duration: 0.6, delay: index * 0.15 }}
-              >
-                {/* Connection line for desktop */}
-                {index < steps.length - 1 && (
-                  <div className="hidden lg:block absolute top-24 -right-8 w-16 h-1 bg-gradient-to-r from-blue-500 to-transparent" />
-                )}
-
-                {/* Step card */}
-                <div className="relative h-full">
-                  {/* Background */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-gray-900/50 to-gray-800/50 rounded-2xl border border-gray-700/50" />
-                  
-                  {/* Glow on hover */}
-                  <motion.div 
-                    className="absolute inset-0 rounded-2xl opacity-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 blur-xl"
-                    whileHover={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-
-                  {/* Content */}
-                  <div className="relative p-8 flex flex-col h-full">
-                    {/* Step number and icon */}
-                    <div className="mb-6">
-                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-white mb-4">
-                        <Icon size={32} />
-                      </div>
-                      <div className="inline-block px-4 py-1 rounded-full bg-blue-500/20 border border-blue-500/50 text-blue-300 text-sm font-semibold">
-                        Step {item.step}
-                      </div>
-                    </div>
-
-                    {/* Title and description */}
-                    <h3 className="text-2xl font-bold text-white mb-2">
-                      {item.title}
-                    </h3>
-                    <p className="text-gray-400 text-sm leading-relaxed flex-grow">
-                      {item.description}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+    <section className="w-full py-24 bg-black relative border-t border-white/5">
+      <div className="container mx-auto px-6">
+        <div className="text-center max-w-2xl mx-auto mb-20">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-3xl md:text-5xl font-bold text-white mb-4"
+          >
+            How It{' '}
+            <span
+              style={{
+                backgroundImage: 'linear-gradient(90deg,#22d3ee,#8b5cf6)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              Works
+            </span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-zinc-400 text-lg"
+          >
+            Three simple steps to unlock the future of human-computer interaction.
+          </motion.p>
         </div>
 
-        {/* Bottom text */}
-        <motion.div 
-          className="text-center mt-16"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-        >
-          <p className="text-gray-400 text-base sm:text-lg">
-            All processing happens <span className="text-blue-400 font-semibold">locally on your device</span> — fast, secure, and private
-          </p>
-        </motion.div>
+        <div className="relative">
+          {/* connecting line */}
+          <div
+            className="hidden md:block absolute top-10 left-0 w-full h-px -z-0"
+            style={{ background: 'linear-gradient(90deg,transparent,rgba(139,92,246,0.4),transparent)' }}
+          />
+
+          <div className="grid md:grid-cols-3 gap-12 md:gap-6 relative z-10">
+            {steps.map((step, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-80px' }}
+                transition={{ duration: 0.55, delay: idx * 0.18 }}
+                className="flex flex-col items-center text-center group"
+              >
+                {/* icon box */}
+                <div
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6 relative border border-white/10 group-hover:border-violet-500/50 transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.04)' }}
+                >
+                  {step.icon}
+                  <span
+                    className="absolute -top-3 -right-3 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-zinc-400 border border-white/10"
+                    style={{ background: '#000' }}
+                  >
+                    {step.num}
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-bold text-white mb-3">{step.title}</h3>
+                <p className="text-zinc-400 px-4">{step.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
-};
-
-export default HowItWorks;
+}

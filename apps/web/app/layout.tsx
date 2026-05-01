@@ -25,7 +25,7 @@ export default function RootLayout({
         />
       </head>
 
-      <body className="min-h-screen bg-gray-50 text-slate-900">
+      <body className="min-h-screen bg-black text-white antialiased">
         <Providers>
           <Nav />
           {children}
