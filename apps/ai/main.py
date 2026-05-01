@@ -9,7 +9,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import threading
 import time
-import cv as cv_module
+from . import cv as cv_module
 
 # ── Allowed origins (configurable via env) ────────────────────────────────────
 ALLOWED_ORIGINS: list[str] = [
